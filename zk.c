@@ -13,6 +13,34 @@ void opener(){
     printf("\n\nK@mi soft\ngithub.com:kamighost1\n\n");
 }
 
+void help_menu(){
+    printf("\tHELP MENU\n");
+    printf("./e --start - start zk basic model\n");
+    printf("./e --nod - examle NOD\n");
+    printf("./e --rand - check random\n");
+    printf("./e --sign < private key >  < message > - sign msg with private key (use numbers)\n");
+    printf("./e --info - get ingo about system\n");
+    printf("./e --gen - generate private key\n");
+    printf("\n");
+}
+
+void info(){
+    printf("\n");
+    printf("N: %d\n", P*Q);
+    printf("\n");
+}
+
+
+void generate_key(){
+    int N = P*Q;
+    int num = get_rand(1, N-1);
+    while (NOD(N, num) != 1)
+    {
+        num = get_rand(1, N-1);
+    }
+    printf("\nyour secret is: %d\n\n", num);
+}
+
 int check_parameters(int c, char **v){
     if(c == 1){
         printf("its Zero Knowledge test programm. for more info use flag -h");
@@ -21,7 +49,15 @@ int check_parameters(int c, char **v){
     }
     if(c == 2){
         if(!strcmp(v[1], "-h")){
-            printf("help menu\n");
+            help_menu();
+            return 0;
+        }
+        if(!strcmp(v[1], "--info")){
+            info();
+            return 0;
+        }
+        if(!strcmp(v[1], "--gen")){
+            generate_key();
             return 0;
         }
         if(!strcmp(v[1], "--rand")){
@@ -41,7 +77,12 @@ int check_parameters(int c, char **v){
             return 1;
         }
     }
-
+    if(c == 4){
+        if(!strcmp(v[1], "--sign")){
+            sign(atoi(v[2]), atoi(v[3]));
+            return 2;
+        }
+    }
     printf("unknow parameters...\nuse -h for help\n");
 }
 
@@ -77,9 +118,11 @@ int zk_pow_mode(int base, int e,  int mod){
     int num = 1;
     while( e != 0 ){
         if( e & 1 ){
-            num = num * base % mod;
+            // num = num * base % mod;
+            num = zk_mode(num*base, mod);
         }
-        base = base * base % mod;
+        // base = base * base % mod;
+        base = zk_mode(base*base, mod);
         e = e>>1;
     }
     return num;
@@ -124,6 +167,50 @@ void zk(){
         printf("Valid. Access allowed!\n");
     }
     
+}
+
+void sign(int private, int msg){
+    printf("signing\nprivate key: %d\nmsg: %d\n", private, msg);
+    int public, y,ysqrt, x, r, e,yroot;
+    int N = P * Q;
+    int VALID = 0;
+    if(NOD(private, N) != 1 || private >= N){
+        printf("Not valid private key\n");
+        exit(1);
+    }
+    public = zk_pow_mode(private,2,N);
+    #ifdef DEBUG_MAIN
+    printf("public A: %d\nN: %d\n", public, N);
+    #endif
+     for(int i = 0; i < CICLES_CHECK; i++){
+        r = get_rand(1, N-1);
+        r*=msg;
+        if(r >= N-1){
+            r = zk_mode(r, N);
+        }
+        x = zk_pow_mode(r, 2, N);
+        e = get_rand(0,1);
+        #ifdef CHECK_SECRET_VALID
+        private-=1;
+        #endif
+        y = zk_pow_mode(r*private, e, N);
+        yroot = zk_pow_mode(x*public, e, N);
+        ysqrt = zk_pow_mode(y,2,N);
+
+        #ifdef DEBUG_CICLE
+        printf("i: %d;\ty==yroot ?  %s\tysqrt: %d\tyroot: %d\n", i+1, ysqrt==yroot ? "true" : "false", ysqrt, yroot);
+                #ifdef DEBUG_ALL
+                printf("\nr: %d\te: %d\tx: %d\n\n",r, e, x);
+                #endif
+        #endif
+        if(yroot == ysqrt)
+            VALID++;
+    }
+    if(VALID != CICLES_CHECK){
+        printf("Not Valid. Access denied!\n");
+    }else{
+        printf("Valid. Access allowed!\n");
+    }
 }
 
 int get_rand(const int min, const int max) {
